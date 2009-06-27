@@ -34,7 +34,7 @@
 
 int xbee_open(struct net_device *dev)
 {
-//	printk(KERN_ALERT "[NET open called ]\n");
+	printk(KERN_ALERT "[NET open called ]\n");
 	
 	
 	/* request_region(), request_irq(), ....  (like fops->open) */
@@ -53,7 +53,7 @@ int xbee_open(struct net_device *dev)
 
 int xbee_release(struct net_device *dev)
 {
-//	printk(KERN_ALERT "[NET release called ]\n");
+	printk(KERN_ALERT "[NET release called ]\n");
 	
 	/* release ports, irq and such -- like fops->close */
 
@@ -171,7 +171,7 @@ void xbee_receive_packet(struct net_device *dev, unsigned char *data, int len)
 
 	switch(*data) {
 		case ZIGBEE_RECEIVE_PACKET:
-			//printk(KERN_ALERT "[XBEE] Zigbee Receive Packet Frame received\n");
+			printk(KERN_ALERT "[XBEE] Zigbee Receive Packet Frame received\n");
 			if(len<13) {
 				printk(KERN_ALERT "[XBEE] Packet too short to be a Receive Packet Frame!\n");
 				goto out;
@@ -194,6 +194,7 @@ void xbee_receive_packet(struct net_device *dev, unsigned char *data, int len)
 
 			if(data[5] == TRANSMIT_SUCCESS) {
 				printk(KERN_ALERT "[XBEE] Packet delivery reported as success!\n");
+                //TODO: report which packet by reading message (and notify super-paranoid drivers?)
 			} else {
                 if(data[5] == TRANSMIT_INVALID) {
                     printk(KERN_ALERT "[XBEE] Transmit failed: invalid endpoint\n");
@@ -361,7 +362,7 @@ int xbee_tx(struct sk_buff *skb, struct net_device *dev)
 	};
 		
 	if(main_tty == NULL) {
-		printk(KERN_ALERT "No tty attached!\n");
+		printk(KERN_ALERT "No tty attached!\nMake sure ldisc_daemon is running\n");
 		return 0;
 	}
 		
@@ -448,7 +449,7 @@ static int xbee_mac_addr(struct net_device *dev, void *p) {
 	
 	struct sockaddr *addr = p;
 
-	printk(KERN_ALERT "[NET mac_addr called ]\n");
+	//printk(KERN_ALERT "[NET mac_addr called ]\n");
 
 	if (netif_running(dev))
 		return -EBUSY;
@@ -534,11 +535,11 @@ static int n_turk_open(struct tty_struct *tty) {
 	if( main_tty != NULL )
 		return -EPERM;
 	
-	main_tty = tty;
-	//printk(KERN_ALERT "Attached to a tty!\n\n");
-	
 	if (!try_module_get(THIS_MODULE))
 		return -ENODEV;
+	
+	main_tty = tty;
+	printk(KERN_ALERT "Attached to a tty!\n\n");
 	
 	priv->rbuff = kmalloc(XBEE_MAXFRAME, GFP_KERNEL);
 	priv->rcount = 0;
@@ -552,7 +553,7 @@ static void n_turk_close(struct tty_struct *tty) {
 	
 	struct xbee_priv *priv = netdev_priv(xbee_dev);
 	
-	//printk(KERN_ALERT "CLOSE CALLED\n");
+	printk(KERN_ALERT "CLOSE CALLED\n");
 
 	module_put(THIS_MODULE);
 	
@@ -568,7 +569,7 @@ static void n_turk_flush_buffer(struct tty_struct *tty) {
 }
 
 static ssize_t	n_turk_chars_in_buffer(struct tty_struct *tty) {
-	printk(KERN_ALERT "CHARS_IN_BUFFER CALLED\n");
+	//printk(KERN_ALERT "CHARS_IN_BUFFER CALLED\n");
 
 	return 0;
 }
@@ -610,7 +611,7 @@ static char checksum_validate(unsigned char *buffer, int len, unsigned char chec
 static void	n_turk_receive_buf(struct tty_struct *tty, const unsigned char *cp, char *fp, int count) {
 	
 	unsigned char temp;
-//	printk(KERN_ALERT "RECEIVE_BUF CALLED  %d chars received\n", count);
+	printk(KERN_ALERT "RECEIVE_BUF CALLED  %d chars received\n", count);
 
 	struct xbee_priv *priv = netdev_priv(xbee_dev);
 	unsigned char checksum;
