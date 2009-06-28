@@ -93,7 +93,6 @@ int xbee_config(struct net_device *dev, struct ifmap *map)
  */
 void xbee_rx(struct net_device *dev, unsigned char *data, int len, u16 udp_port) {
 
-    int i;
 	struct xbee_priv *priv = netdev_priv(dev);
 
 	//printk(KERN_ALERT "[NET] Encapsulating packet: length %d\n", len);
@@ -270,9 +269,7 @@ static void xbee_hw_tx(char *frame, int len, struct net_device *dev)
 	unsigned char checksum;
 	int actual;
 	
-	struct xbee_priv *priv = netdev_priv(dev);
-	
-	//printk(KERN_ALERT "[NET hardware_tx called, %d bytes ]\n", len);
+	printk(KERN_ALERT "[NET hardware_tx called, %d bytes ]\n", len);
 	
 	//Add start delimiter
 	*frame = 0x7E;
@@ -350,6 +347,7 @@ int xbee_tx(struct sk_buff *skb, struct net_device *dev)
 	
 	int framelen, datalen;
 	char *frame;
+    struct udphdr *udp_header;
 	
 	struct xbee_priv *priv = netdev_priv(dev);
 	
@@ -389,6 +387,10 @@ int xbee_tx(struct sk_buff *skb, struct net_device *dev)
 	framelen = 1 + escape_into((frame + 1), &header, sizeof(header));
     
     /* Escaping the UDP header */
+    // First fix the length field - the packet is now 8 bytes shorter
+    udp_header = (struct udphdr *)(skb->data + PACKET_DATA_OFFSET);
+    udp_header->len = cpu_to_be16(be16_to_cpu(udp_header->len) - 8);
+
     //printk(KERN_ALERT "Adding UDP header - length is %u\n", sizeof(struct udphdr));
 	framelen += escape_into((frame + framelen), (skb->data + PACKET_DATA_OFFSET), sizeof(struct udphdr));
 	
@@ -611,7 +613,7 @@ static char checksum_validate(unsigned char *buffer, int len, unsigned char chec
 static void	n_turk_receive_buf(struct tty_struct *tty, const unsigned char *cp, char *fp, int count) {
 	
 	unsigned char temp;
-	printk(KERN_ALERT "RECEIVE_BUF CALLED  %d chars received\n", count);
+	printk(KERN_ALERT "[XBEE] RECEIVE_BUF CALLED  %d chars received\n", count);
 
 	struct xbee_priv *priv = netdev_priv(xbee_dev);
 	unsigned char checksum;
