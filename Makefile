@@ -1,18 +1,21 @@
-obj-m := n_turk.o
+obj-m := n_xbee.o
 
-KERNELDIR := /home/rob/linux-2.6.25.10/
+KERNELDIR := ./kernel/
 
 PWD := $(shell pwd)
 
-default:
+CC := ${OE}/tmp/cross/armv7a/bin/arm-angstrom-linux-gnueabi-gcc
+
+default: driver ldisc_daemon
+
+clean:
+	rm -f *.ko *.o *.mod.c Module.symvers modules.order
+
+driver:
+	@echo "Building driver"
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
 	
-ldiscdaemon:
-	avr32-linux-gcc -o ldisc_daemon ldisc_daemon.c
+ldisc_daemon:
+	@echo "Building line discipline daemon"
+	$(CC) -o ldisc_daemon ldisc_daemon.c
 
-injector:
-	avr32-linux-gcc -o injector injector.c
-	
-listener:
-	avr32-linux-gcc -o udp_listener udp_listener.c
-	

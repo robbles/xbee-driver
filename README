@@ -1,0 +1,25 @@
+
+== XBEE Driver ==
+
+This is a Linux kernel driver that allows you to use a Digi Xbee module in API
+mode through a network interface. It uses a line discipline to talk to the
+module through the serial port. The adaptation of Zigbee PAN to IP LAN is done
+by adding an IP broadcast header to all incoming packets, and using the first 8
+bytes of outgoing packets as the destination 802.15.4 hardware address. A
+utility daemon is provided to setup the serial port's baud rate and other
+parameters, and to attach the line discipline once loaded into the running
+kernel.
+
+To build:
+- Change KERNELDIR in Makefile to the location of your kernel tree
+- Change CC in Makefile to the gcc [cross-]compiler for your system
+- make
+
+To use:
+- insmod n_xbee.ko
+- Run ldisc_daemon with the serial port and baud rate of the Xbee module to attach
+the line discipline to the serial port. It will automatically fork into the background.
+- Configure the network interface (xbee0) with ifconfig
+
+
+

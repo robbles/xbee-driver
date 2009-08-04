@@ -1,5 +1,5 @@
-#ifndef _N_TURK_H
-#define N_TURK_H
+#ifndef _N_XBEE_H
+#define N_XBEE_H
 
 #include <linux/skbuff.h>
 
@@ -7,7 +7,7 @@
 //Maximum possible size of serial frame (hopefully)
 #define XBEE_MAXFRAME (XBEE_DATA_MTU*2 + 16)
 
-#define N_TURK 18
+#define N_XBEE 17
 
 int pool_size = 8;
 
@@ -84,5 +84,5 @@ struct net_device *xbee_dev;
 
 
 
-#endif /* N_TURK_H */
+#endif /* N_XBEE_H */
 

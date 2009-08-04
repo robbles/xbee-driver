@@ -21,7 +21,7 @@
 #include <linux/ip.h>
 #include <net/checksum.h>
 
-#include "n_turk.h"
+#include "n_xbee.h"
 
 /*
 **************Network functions************
@@ -91,13 +91,12 @@ int xbee_config(struct net_device *dev, struct ifmap *map)
 /*
  * Encapsulate a packet with UDP/IP and hand off to upper networking layers
  */
-void xbee_rx(struct net_device *dev, unsigned char *data, int len, u16 udp_port) {
+void xbee_rx(struct net_device *dev, unsigned char *data, int len) {
 
 	struct xbee_priv *priv = netdev_priv(dev);
-
-	//printk(KERN_ALERT "[NET] Encapsulating packet: length %d\n", len);
-
 	struct sk_buff *skb;
+	struct iphdr *ih;
+    int packet_stat;
 
 	skb = dev_alloc_skb(len + sizeof(struct udphdr) + sizeof(struct iphdr));
 	if (!skb) {
@@ -111,18 +110,8 @@ void xbee_rx(struct net_device *dev, unsigned char *data, int len, u16 udp_port)
 	// Put all the data into a new socket buffer
 	memcpy(skb_put(skb, len), data, len);
 	
-	// Make a udp header and stick it on, if it isn't a normal TURK packet
-	if(udp_port) {
-        struct udphdr *uh = (struct udphdr*)skb_push(skb, sizeof(struct udphdr));
-        uh->source = udp_port;
-        uh->dest = udp_port;
-        uh->len = htons(len + 8);
-        uh->check = 0x00;
-        skb_reset_transport_header(skb);
-    }
-
-    //Normally add just a IP header, since TURK packets already include UDP
-	struct iphdr *ih = (struct iphdr*)skb_push(skb, sizeof(struct iphdr));
+    // Add an IP header and pretend it's a broadcast packet
+    ih = (struct iphdr*)skb_push(skb, sizeof(struct iphdr));
 	ih->version = 4;
 	ih->ihl = 5;
 	ih->tos = 0;
@@ -142,7 +131,7 @@ void xbee_rx(struct net_device *dev, unsigned char *data, int len, u16 udp_port)
 	skb->protocol = ETH_P_IP;
 	skb->ip_summed = CHECKSUM_UNNECESSARY; // don't check it (does this make any difference?)
 	
-	int packet_stat = netif_rx(skb);
+	packet_stat = netif_rx(skb);
 	
 	if(packet_stat == NET_RX_SUCCESS) {
 		printk(KERN_ALERT "[NET] Packet received successfully\n");
@@ -175,13 +164,8 @@ void xbee_receive_packet(struct net_device *dev, unsigned char *data, int len)
 				printk(KERN_ALERT "[XBEE] Packet too short to be a Receive Packet Frame!\n");
 				goto out;
 			}
-            //Shorter than XBEE framing bytes + UDP header
-			if(len<21) {
-				printk(KERN_ALERT "[XBEE] Not a valid TURK Packet!\n");
-				goto out;
-			}
 
-			xbee_rx(dev, (data + 12), len - 12, 0);
+			xbee_rx(dev, (data + 12), len - 12);
 			goto out;
 
 		case ZIGBEE_TRANSMIT_STATUS:
@@ -204,8 +188,6 @@ void xbee_receive_packet(struct net_device *dev, unsigned char *data, int len)
                 }
 			}
 
-			//Send it to port 50100, some other process can deal with it...
-			xbee_rx(dev, data, len, 50100);
 			goto out;
 
 		case NODE_IDENTIFICATION_INDICATOR:
@@ -248,8 +230,6 @@ void xbee_receive_packet(struct net_device *dev, unsigned char *data, int len)
 		printk(KERN_ALERT "[XBEE] UNKNOWN Frame Received : errors %lu\n", priv->stats.rx_dropped++);
 	}
 	
-	//Send unhandled packets to port 50100 for logging or something...
-	xbee_rx(dev, data, len, 50100);
 
 	out:
 	  return;
@@ -300,8 +280,8 @@ static void xbee_hw_tx(char *frame, int len, struct net_device *dev)
 		main_tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
 		
 		//printk(KERN_ALERT "Writing the data to tty...\n");
-		actual = main_tty->driver->write(main_tty, frame, len);
-		
+		actual = main_tty->driver->ops->write(main_tty, frame, len);
+	 	
 		if(actual != len) { 
 			printk(KERN_ALERT "Write failed!\n");
 		}
@@ -527,7 +507,7 @@ void xbee_init(struct net_device *dev)
 /*
 * The following routines are called from above (user space/tty).
 */
-static int n_turk_open(struct tty_struct *tty) {
+static int n_xbee_open(struct tty_struct *tty) {
 	
 	struct xbee_priv *priv = netdev_priv(xbee_dev);
 	
@@ -551,7 +531,7 @@ static int n_turk_open(struct tty_struct *tty) {
 	return 0;
 }
 
-static void n_turk_close(struct tty_struct *tty) {
+static void n_xbee_close(struct tty_struct *tty) {
 	
 	struct xbee_priv *priv = netdev_priv(xbee_dev);
 	
@@ -565,25 +545,25 @@ static void n_turk_close(struct tty_struct *tty) {
 	
 }
 
-static void n_turk_flush_buffer(struct tty_struct *tty) {
+static void n_xbee_flush_buffer(struct tty_struct *tty) {
 	//printk(KERN_ALERT "FLUSH_BUFFER CALLED\n");
 
 }
 
-static ssize_t	n_turk_chars_in_buffer(struct tty_struct *tty) {
+static ssize_t	n_xbee_chars_in_buffer(struct tty_struct *tty) {
 	//printk(KERN_ALERT "CHARS_IN_BUFFER CALLED\n");
 
 	return 0;
 }
 
-static int n_turk_ioctl(struct tty_struct * tty, struct file * file, unsigned int cmd, unsigned long arg) {
+static int n_xbee_ioctl(struct tty_struct * tty, struct file * file, unsigned int cmd, unsigned long arg) {
 	printk(KERN_ALERT "IOCTL CALLED\n");
 
 	return -EPERM;
 }
 
 
-static unsigned int n_turk_poll(struct tty_struct *tty, struct file *file, struct poll_table_struct *poll) {
+static unsigned int n_xbee_poll(struct tty_struct *tty, struct file *file, struct poll_table_struct *poll) {
 	printk(KERN_ALERT "POLL CALLED\n");
 
 	return 0;
@@ -610,14 +590,14 @@ static char checksum_validate(unsigned char *buffer, int len, unsigned char chec
 /*
  * Called from the serial driver when new received data is ready
  */
-static void	n_turk_receive_buf(struct tty_struct *tty, const unsigned char *cp, char *fp, int count) {
+static void	n_xbee_receive_buf(struct tty_struct *tty, const unsigned char *cp, char *fp, int count) {
 	
 	unsigned char temp;
-	printk(KERN_ALERT "[XBEE] RECEIVE_BUF CALLED  %d chars received\n", count);
-
 	struct xbee_priv *priv = netdev_priv(xbee_dev);
 	unsigned char checksum;
 	
+	printk(KERN_ALERT "[XBEE] RECEIVE_BUF CALLED  %d chars received\n", count);
+
 	while(count--) {
 		
 		temp = *cp++;
@@ -695,7 +675,7 @@ static void	n_turk_receive_buf(struct tty_struct *tty, const unsigned char *cp, 
 	
 }
 
-static void	n_turk_write_wakeup(struct tty_struct *tty) {
+static void	n_xbee_write_wakeup(struct tty_struct *tty) {
 
 	main_tty->flags &= ~(1 << TTY_DO_WRITE_WAKEUP);
 	
@@ -703,22 +683,22 @@ static void	n_turk_write_wakeup(struct tty_struct *tty) {
 }
 
 
-struct tty_ldisc n_turk_ldisc = {
+struct tty_ldisc_ops n_xbee_ldisc = {
+    .owner           = THIS_MODULE,
 	.magic           = TTY_LDISC_MAGIC,
-	.name            = "n_turk",
-	.open            = n_turk_open, /* TTY */
-	.close           = n_turk_close, /* TTY */
-	.flush_buffer    = n_turk_flush_buffer, /* TTY */
-	.chars_in_buffer = n_turk_chars_in_buffer, /* TTY */
+	.name            = "n_xbee",
+	.open            = n_xbee_open, /* TTY */
+	.close           = n_xbee_close, /* TTY */
+	.flush_buffer    = n_xbee_flush_buffer, /* TTY */
+	.chars_in_buffer = n_xbee_chars_in_buffer, /* TTY */
 	.read            = NULL, /* TTY */
 	.write           = NULL, /* TTY */
-	.ioctl           = n_turk_ioctl, /* TTY */
+	.ioctl           = n_xbee_ioctl, /* TTY */
 	.set_termios     = NULL, /* FIXME no support for termios setting yet */
-	.poll            = n_turk_poll,
-	.receive_buf     = n_turk_receive_buf, /* Serial driver */
-	.write_wakeup    = n_turk_write_wakeup /* Serial driver */
+	.poll            = n_xbee_poll,
+	.receive_buf     = n_xbee_receive_buf, /* Serial driver */
+	.write_wakeup    = n_xbee_write_wakeup /* Serial driver */
 };
-
 
 
 /*
@@ -745,14 +725,16 @@ int xbee_init_module(void)
 	int result, ret=0;
 
 	//Register the line discipline
-	result = tty_register_ldisc(N_XBEE, &n_turk_ldisc);
+    // TODO: actually use a well-known discipline instead of over-riding
+    // a relatively pointless one (N_SLCAN?)
+	result = tty_register_ldisc(N_XBEE, &n_xbee_ldisc);
 	if(result) {
 		printk(KERN_ALERT "Registering the line discipline failed with error %d\n", result);
 		return result;
 	}
 	
 	/* Allocate the devices */
-	xbee_dev = alloc_netdev(sizeof(struct xbee_priv), "zigbee%d",
+	xbee_dev = alloc_netdev(sizeof(struct xbee_priv), "xbee%d",
 				     xbee_init);
 	
 	
